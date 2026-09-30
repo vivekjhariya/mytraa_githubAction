@@ -6,60 +6,89 @@ A polished, Myntra-inspired fashion storefront built with React, Vite and Expres
 
 ```bash
 npm install
-cp .env.example .env # on Windows, copy .env.example .env
+cp .env.example .env   # on Windows: copy .env.example .env
 npm run dev
-```
 
-Open [http://localhost:5173](http://localhost:5173). The Vite dev server proxies no API calls: the frontend defaults to `/api`, so use the included Vite development setup with the API at port 3001, or set `VITE_API_URL=http://localhost:3001/api` in `.env`.
+Open http://localhost:5173.
+The Vite dev server does not proxy API calls by default. The frontend uses /api, so either:
 
-For a production-style single server:
+run the API on port 3001, or
+set VITE_API_URL=http://localhost:3001/api in .env
 
-```bash
+Production-style single server ------------------------------------------------------------------
+
 npm run build
 NODE_ENV=production npm start
-```
 
-The production server serves `dist` and the API on port 3001. Docker Compose starts the app with MySQL:
+The production server serves dist and the API on port 3001.
+Docker Compose (app + MySQL)
 
-```bash
+cp .env.example .env   # set JWT_SECRET, MYSQL_* values
 docker compose up --build
-```
 
-## Project structure
+Project structure  -----------------------------------------------------------------------------
 
-The client is organized by application shell, reusable UI, feature boundaries,
-pages, services, hooks, and shared libraries:
-
-```
 src/app             router and application providers
 src/components      layout and reusable UI
 src/features        auth, cart, catalog, and wishlist boundaries
-src/pages            route-level screens
-src/services         API clients
-src/hooks            shared state hooks
-src/lib              formatting and utilities
-server               config, routes, controllers, services, middleware, data
-```
+src/pages           route-level screens
+src/services        API clients
+src/hooks           shared state hooks
+src/lib             formatting and utilities
+server              config, routes, controllers, services, middleware, data
+.github/workflows   GitHub Actions CI/CD pipelines
 
-## Persistence and API
+Persistence and API ---------------------------------------------------------------------------------
 
-Without database variables, signup/login and cart data use a graceful in-memory demo store. When MySQL variables are available, users are stored in the `users` table; the app still falls back safely if MySQL cannot be reached. Products are seeded in `server.js` and mirrored in `server/data/products.js` for
-feature-oriented server modules so the demo works immediately.
+Without database variables, signup/login and cart data use an in-memory demo store. When MySQL variables are available, users are stored in the users table; the app still falls back safely if MySQL cannot be reached.
+Products are seeded in server.js and mirrored in server/data/products.js.
+On startup, the API creates required tables: users, cart_items, orders, and order_items (see server/data/schema.sql). Checkout writes an order and line items to MySQL and clears the user's cart after a successful transaction.
 
-On startup, the API creates the schema required by the application: `users`,
-`cart_items`, `orders`, and `order_items`. The same migration-safe statements
-are documented in `server/data/schema.sql`. Checkout writes an order and its
-line items to MySQL and clears the user's persisted cart after a successful
-transaction.
+CI/CD with GitHub Actions ------------------------------------------------------------------------------
+Pipeline lives in:
+text.github/workflows/ci-cd.yml
 
-Endpoints include `GET /api/products` (and the modular `GET /api/catalog/products`),
-`POST /api/auth/signup`, `POST /api/auth/login`, authenticated cart CRUD at
-`/api/cart`, authenticated order history at `GET /api/orders`, order creation at
-`POST /api/orders`, `POST /api/coupons/validate`, and `GET /api/health`.
+What the workflow does
+On push / pull request to main:
 
-## Notes
+Checkout code
+Install dependencies
+Security scans (e.g. Trivy)
+Build Docker image
+Scan image
+Push image to Docker Hub (vjstylose/myntraa)
+(Optional) Deploy with Docker Compose on a self-hosted runner / server
 
-This is a self-contained demo storefront. Replace `JWT_SECRET`, use HTTPS, add a payment provider and add production-grade validation/rate limiting before launching publicly.
+Required GitHub Secrets
+Repo → Settings → Secrets and variables → Actions
 
-## pull dockerHub  latest image
-docker pull vjstylose/myntraa:latest
+DOCKERHUB_USERNAMEDocker   -> Hub username
+DOCKERHUB_TOKENDocker      ->  Hub access token
+JWT_SECRETApp              -> JWT secret (deploy)
+MYSQL_ROOT_PASSWORDMySQL    -> root password (deploy)
+MYSQL_PASSWORDMySQL        ->  app user password (deploy)
+SONAR_TOKENSonarQube        ->  analysis
+SONAR_HOST_URLSonarQube    ->  server URL
+NVD_API_KEYOWASP         -> Dependency-Check
+
+vjstylose/myntraa:latestLatest  -> successful main build
+vjstylose/myntraa:build-<run_number>Specific  -> workflow run
+
+Pull latest image from Docker Hub----------------------------------------------------------------------------
+Bashdocker pull vjstylose/myntraa:latest
+Deploy from published image------------------------------------------------------------------------
+# ensure .env has JWT_SECRET, MYSQL_ROOT_PASSWORD, MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD
+docker compose pull
+docker compose up -d
+
+Notes
+This is a self-contained demo storefront. Before a public launch:
+
+replace JWT_SECRET
+use HTTPS
+add a real payment provider
+add production-grade validation and rate limiting
+do not commit real .env files (keep secrets in GitHub Actions secrets / server env)
+
+
+
